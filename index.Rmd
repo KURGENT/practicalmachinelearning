@@ -1,0 +1,89 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Kumiko Urgent"
+date: "7/20/2020"
+output: html_document
+---
+
+Overview:
+It is common to use devices such as Jawbone Up, Nike FuelBand, and Fitbit to collect quantified data about personal physical activities. However, there are not much researach done to confirm if such quantified data can predict how well those activities are done. We will use the data from a study called "Qualitative Activity Recognition of Weight Lifting Exercises" by Velloso, Bulling, Gellersen and et.al to investigate whether the manner of the excersices can be predicted by measurements from accelerometers on the belt, forearm, arm, and dumbell of 6 participants in the study.
+
+
+Step 1: 
+First, the necessary packages are loaded and the data are downloaded.
+Names function was used to see the variable content in both datasets.
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(caret)
+library(AppliedPredictiveModeling)
+
+setwd("~/GitHub/practicalmachinelearning")
+training <-  read.csv("pml-training.csv")
+val <- read.csv("pml-testing.csv")
+dim(training)
+dim(val)
+names(training)
+names(val)
+```
+Both training and testing datasets have 160 variables and the variable names are the same except the outcome variable ("classe" vs "problem_id". So we will split training data into two groups: train_data and test_data for model fitting, while testing dataset (object = "val") will be used for validation.  However, we will pre-process data first.
+
+Step 1. PreProcessing data
+Subset only variables relevant to measurements and remove variables with missing data.
+```{r}
+train0 <- training[,-c(1:7)]
+train1 <- train0[,colSums(is.na(train0)) == 0]
+names(train1)
+```
+Remove variables with zero or near zero variance.
+```{r}
+nzv <- nearZeroVar(train1)
+train2<-train1[, -nzv]
+dim(train2)
+names(train2)
+```
+
+Step 2. Splitting dataset
+We will split the training dataset into train and test data set.
+
+```{r}
+set.seed(99999)
+InTrain <- createDataPartition(y = train2$classe, p = .7, list = FALSE)
+train_data <- train2[InTrain,]
+test_data <- train2[-InTrain,]
+rbind("training" = dim(train_data), "teting" = dim(test_data))
+names(train_data)
+names(test_data)
+```
+
+
+Step 3. Cross Validation
+We will use K-fold cross validation, using 3 folds.
+
+```{r}
+fitControl <- trainControl(method = "cv", number = 3)
+```
+
+Step 4. Model fitting
+Fit the model using the above cross validation.  Random forest is used.
+
+
+```{r}
+modFit_rf <- train(classe ~., data = train_data, method = "rf", trControl = fitControl)
+print(modFit_rf$finalModel)
+```
+
+Step 5. Predict outcome ("classe" variable) of test_data using the model and Evaluate
+As an error rate is very low (0.74%), we will use this model to predict the classe of test_data.  ConfusionMatric will be used to see out of sample error.
+```{r}
+pred_rf <- predict(modFit_rf, newdata = test_data)
+table(pred_rf, test_data$classe)
+confusionMatrix(pred_rf,test_data$classe)
+```
+Step 6. 
+Since the accuracy rate is 99.05% and very high. So, we will use this model to predict outcome of validation data set as well.
+```{r}
+pred_val <- predict(modFit_rf, newdata = val)
+pred_val
+```
